@@ -137,6 +137,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\face.jpg" />
+    <Image Include="Resources\intial_shot.jpg" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EdgeDetection.h" />

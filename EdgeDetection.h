@@ -25,6 +25,9 @@ class EdgeDetection
             double param1 = 100, double param2 = 30,
             int minRadius = 0, int maxRadius = 0);
 
+        // New method to process a video file or stream and apply edge & circle detection
+        void processVideo(const std::string& videoPath, const std::string& outputPath);
+
     private:
         double _lowThreshold;     // Lower threshold for Canny edge detection
         double _highThreshold;    // Upper threshold for Canny edge detection

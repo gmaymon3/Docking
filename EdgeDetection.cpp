@@ -3,6 +3,8 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
+#include <vector>
+
 
 EdgeDetection::EdgeDetection(double lowThreshold, double highThreshold)
 {
@@ -62,25 +64,56 @@ std::vector<cv::Vec3f> EdgeDetection::detectCircles(double dp, double minDist, d
     // Perform Hough Circle Transform on the edge-detected image
     cv::HoughCircles(_edgeImage, circles, cv::HOUGH_GRADIENT, dp, minDist, param1, param2, minRadius, maxRadius);
 
-    //// Draw the detected circles on a copy of the edge-detected image
-    //cv::Mat displayImage = _edgeImage.clone();
-    //cv::cvtColor(displayImage, displayImage, cv::COLOR_GRAY2BGR); // Convert to color to display circles
-
-    //for (const auto& circle : circles)
-    //{
-    //    cv::Point center(cvRound(circle[0]), cvRound(circle[1]));
-    //    int radius = cvRound(circle[2]);
-    //    std::cout << "The radius of this circle is: " << radius << std::endl; 
-    //    cv::circle(displayImage, center, radius, cv::Scalar(0, 255, 0), 2);  // Draw the circle
-    //    cv::circle(displayImage, center, 2, cv::Scalar(0, 0, 255), 3);      // Draw the center
-    //}
-
-    // Show the image with circles
-    //cv::imshow("Detected Circles", displayImage);
-
     return circles; // Return the list of detected circles
 }
 
+
+// Method to output circles in the edge-detected image
+void EdgeDetection::outputCircles(double dp, double minDist, double param1, double param2, int minRadius, int maxRadius)
+{
+    std::vector<cv::Vec3f> circles; // To store the detected circles
+
+    if (_edgeImage.empty())
+    {
+        std::cerr << "Error: No edge image to display!" << std::endl;
+    }
+
+    // Perform Hough Circle Transform on the edge-detected image
+    cv::HoughCircles(_edgeImage, circles, cv::HOUGH_GRADIENT, dp, minDist, param1, param2, minRadius, maxRadius);
+    // Create a display image to show detected edges and circles
+    
+    cv::Mat displayImage = _edgeImage.clone();
+    cv::cvtColor(displayImage, displayImage, cv::COLOR_GRAY2BGR); // Convert to color to display circles
+    for (const auto& circle : circles)
+    {
+        cv::Point center(cvRound(circle[0]), cvRound(circle[1]));
+        int radius = cvRound(circle[2]);
+        cv::circle(displayImage, center, radius, cv::Scalar(0, 255, 0), 2);
+        cv::circle(displayImage, center, 2, cv::Scalar(0, 0, 255), 3);
+        std::cout << "The circle has a radius of: " << radius << std::endl;
+    }
+
+    // Display the processed frame (optional)
+    cv::imshow("Processed Pic", displayImage);
+}
+
+static std::vector<double> linspace(double start, double end, int num) {
+    std::vector<double> result;
+
+    if (num <= 0) {
+        return result; // Return empty vector if num is not positive
+    }
+    if (num == 1) {
+        result.push_back(start); // Return single value if num is 1
+        return result;
+    }
+
+    double step = (end - start) / (num - 1);
+    for (int i = 0; i < num; ++i) {
+        result.push_back(start + i * step);
+    }
+    return result;
+}
 
 void EdgeDetection::processVideo(const std::string& videoPath, const std::string& outputPath)
 {
@@ -91,6 +124,7 @@ void EdgeDetection::processVideo(const std::string& videoPath, const std::string
         return;
     }
 
+    // Get the frame width and height from the input video
     int frame_width = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
     int frame_height = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
     int fps = static_cast<int>(cap.get(cv::CAP_PROP_FPS));
@@ -104,7 +138,21 @@ void EdgeDetection::processVideo(const std::string& videoPath, const std::string
         return;
     }
 
+    // RPO Telemetry - This is the expected RPO distance between the 2 spacecraft. It can help determine which circle is the correct docking ring. 
+    // This is assuming we get RPO (Rendevous/Docking Operation) data at the same rate as camera data. 
+    int start_dist_meter = 50; 
+    int end_dist_meter = 0; 
+    int total_frames = 153; 
+    auto distance_meters = linspace(start_dist_meter, end_dist_meter, total_frames);
+
+    // Loop through each frame of the video
     cv::Mat frame;
+    int frameCount = 0; 
+    double max_diam_at_start = 75; 
+    double max_diam_at_dock = 140;
+    auto max_diam_curr = 75.0;
+    auto min_diam_curr = 65.0;
+
     while (true)
     {
         cap >> frame;  // Capture frame-by-frame
@@ -113,8 +161,16 @@ void EdgeDetection::processVideo(const std::string& videoPath, const std::string
         // Apply edge detection
         detectEdges(frame);
 
+        // Convert spacecraft distance to expected ring size. 
+        frameCount++;
+        max_diam_curr = max_diam_at_start + (distance_meters[(total_frames-frameCount)] - end_dist_meter) * (max_diam_at_dock - max_diam_at_start) / (start_dist_meter - end_dist_meter);
+        min_diam_curr = max_diam_curr - 15; 
+        //std::cout << "The min diam is: " << min_diam_curr << ", The max diam is: " << max_diam_curr << std::endl;
+        //int min_diam_curr_int = static_cast<int>(min_diam_curr);
+        //int max_diam_curr_int = static_cast<int>(max_diam_curr);
+
         // Detect circles in the edge-detected frame
-        std::vector<cv::Vec3f> circles = detectCircles(1.5, 20, 100, 60, 30, 80);
+        std::vector<cv::Vec3f> circles = detectCircles(1.5, 20, 100, 60, static_cast<int>(min_diam_curr), static_cast<int>(max_diam_curr));
 
         // Create a display image to show detected edges and circles
         cv::Mat displayImage = frame.clone();
@@ -124,6 +180,7 @@ void EdgeDetection::processVideo(const std::string& videoPath, const std::string
             int radius = cvRound(circle[2]);
             cv::circle(displayImage, center, radius, cv::Scalar(0, 255, 0), 2);
             cv::circle(displayImage, center, 2, cv::Scalar(0, 0, 255), 3);
+            std::cout << "The circle has a radius of: " << radius << std::endl; 
         }
 
         // Display the processed frame (optional)
@@ -135,6 +192,7 @@ void EdgeDetection::processVideo(const std::string& videoPath, const std::string
         // Press 'q' to exit early
         if (cv::waitKey(10) == 'q') break;
     }
+    //std::cout << "The total number of frames is: " << frameCount << std::endl;
 
     cap.release();
     videoWriter.release();

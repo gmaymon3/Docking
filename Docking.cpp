@@ -13,7 +13,7 @@ using namespace std;
 int main()
 {
 	// Load Image
-	string image_path = "Resources/Initial_Capture_pic.png"; 
+	string image_path = "Resources/intial_shot.jpg"; 
 	cout << image_path << endl; 
 	Mat img = imread(image_path, IMREAD_COLOR);
 	string label = "Docking Ring";
@@ -24,12 +24,11 @@ int main()
     edgeDetector.detectEdges(img);
 
 	// Detect circles
-	std::vector<cv::Vec3f> circles = edgeDetector.detectCircles(1.5,20,100,60,30,80);
+	std::vector<cv::Vec3f> circles = edgeDetector.detectCircles(1.5,20,100,60,60,75);
 
 	// Video of capture 
-	// // Load Video
-	//string video_path = "Resources/Capture_video.mp4";
-    string video_path = "Resources/Capture_video_short.mp4";
+	 // Load Video
+    string video_path = "Resources/Snipped_Docking_mid.mp4";
 
 	cout << video_path << endl;
 	EdgeDetection edgeDetectorVideo(100, 200);
